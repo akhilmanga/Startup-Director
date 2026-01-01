@@ -6,18 +6,35 @@ export interface StartupContext {
   name: string;
   domain: Domain;
   stage: StartupStage;
-  targetCustomers: string;
-  region: string;
+  url?: string;
+  publicAssets?: string;
+  targetCustomer: string;
+  urgency: string;
   metrics: string;
+  founderAdvantage: string;
+  teamSetup: string;
+  constraints?: string;
+  revenueModel: string;
   goal: string;
 }
 
 export type AgentType = 'CEO' | 'CPO' | 'CMO' | 'SALES' | 'CFO' | 'FUNDRAISING';
 
+export interface PitchDeckSlide {
+  title: string;
+  content: string;
+  visualGuidance: string;
+  imageUrl?: string;
+}
+
 export interface Message {
   role: 'user' | 'model';
   content: string;
   agent?: AgentType;
+  images?: { data: string; mimeType: string }[];
+  files?: { data: string; mimeType: string; name: string }[];
+  isModeSelection?: boolean;
+  slides?: PitchDeckSlide[];
 }
 
 export interface CEOSummary {

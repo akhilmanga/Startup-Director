@@ -1,41 +1,45 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { StartupContext, AgentType, Message, CEOSummary } from "../types";
+import { StartupContext, AgentType, Message, CEOSummary, PitchDeckSlide } from "../types";
 
-const MODEL_NAME = 'gemini-3-flash-preview';
+// Complex Text Tasks (advanced reasoning) should use gemini-3-pro-preview
+const MODEL_NAME = 'gemini-3-pro-preview';
+const IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 const GLOBAL_PRESENTATION_RULES = `
 ABSOLUTE FORMATTING RULES:
 - ZERO MARKDOWN: Never use asterisks (*), double asterisks (**), hashes (#), dashes for lists (-), or horizontal rules (---).
 - UI-NATIVE TEXT: Output clean, professional text intended for a high-end SaaS interface.
 - STRUCTURE: Use uppercase labels on their own lines for hierarchy.
-- DENSITY: DO NOT summarize. Provide large, exhaustive, and in-depth outputs. We need the full strategic depth, not just a briefing.
-- TONE: Executive-grade, confident, direct. Truth > Comfort. Reality > Hype.
+- DENSITY: DO NOT summarize. Provide large, exhaustive, and in-depth outputs.
+- TONE: Executive-grade, confident, direct.
 `;
 
 const ROUTER_INSTRUCTIONS = `
 You are Startup Director, an autonomous executive board coordinator.
 For every user message:
 1. Classify intent:
+   - PITCH DECK CREATION (e.g. "Create a pitch deck", "Build a deck") -> INTERCEPT: DO NOT GENERATE. RESPOND WITH "MODE_SELECTION_REQUIRED".
+   - DOCUMENTS ATTACHED (PDF, PPT, PPTX) -> AUTOMATICALLY ACTIVATE FUNDRAISING AGENT (DECK EVALUATION)
+   - IMAGES ATTACHED -> AUTOMATICALLY ACTIVATE CPO AGENT (UX AUDIT)
    - Product Roadmap, UX, Backlog -> CPO
-   - GTM, Strategy, Acquisition Channels, Execution, Funnels, Experiments, Copy -> CMO
+   - GTM, Strategy, Acquisition Channels -> CMO
    - Pricing, Pipelines, Closing -> SALES
    - Burn, Runway, Forecasts -> CFO
-   - Pitch Deck, Fundraising readiness -> FUNDRAISING
-   - Tradeoffs, Prioritization, High-level Strategy -> CEO
+   - Tradeoffs, Prioritization -> CEO
+   - General questions default to CEO Agent.
 
-2. START your response with exactly: "ACTIVATING [AGENT NAME] — Reason: [INTENT SUMMARY]" in uppercase.
-3. Provide a deep, execution-ready response. If the user asks for roadmaps, GTM plans, or pitch narratives, go end-to-end with tactical depth.
-4. If a screenshot is provided, perform a UX Audit (CPO task).
-5. If a document/text is provided, perform a Pitch Deck Audit (Fundraising task).
+2. FUNDRAISING DECK GENERATION (FOR SELECTED MODES):
+   Once mode is selected (Pre-Traction, Early Users, Traction), generate a slide-by-slide investor-ready deck.
+   EACH SLIDE MUST FOLLOW THIS JSON FORMAT (One per slide):
+   {
+     "title": "SLIDE TITLE",
+     "content": "DETAILED BODY CONTENT (NO MARKDOWN)",
+     "visualGuidance": "DETAILED VISUAL/CHART/GRAPHIC DESCRIPTION"
+   }
+   Respond with a list of slides wrapped in [SLIDES] ... [/SLIDES] tags.
 
-${GLOBAL_PRESENTATION_RULES}
-`;
-
-const REPORT_INSTRUCTIONS = `
-You are a world-class executive board member. You are delivering a definitive, exhaustive DOMAIN MANDATE.
-The output must be LARGE, STRUCTURED, and PERSISTENT. No conversational filler.
-
+3. START your response with exactly: "ACTIVATING [AGENT NAME] — Reason: [INTENT SUMMARY]" in uppercase.
 ${GLOBAL_PRESENTATION_RULES}
 `;
 
@@ -43,19 +47,26 @@ export class StartupDirectorService {
   private ai: GoogleGenAI;
 
   constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    // API key must be obtained exclusively from process.env.API_KEY
+    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
   private getBasePrompt(context: StartupContext) {
     return `
-STARTUP CONTEXT:
+STARTUP CALIBRATION CONTEXT:
 Name: ${context.name}
 Domain: ${context.domain}
 Stage: ${context.stage}
-Customers: ${context.targetCustomers}
-Goal: ${context.goal}
-Metrics: ${context.metrics}
-Region: ${context.region}
+URL: ${context.url || 'N/A'}
+Assets: ${context.publicAssets || 'None provided'}
+Target Customer: ${context.targetCustomer}
+Problem Urgency: ${context.urgency}
+Founder Advantage: ${context.founderAdvantage}
+Team Reality: ${context.teamSetup}
+Revenue Model: ${context.revenueModel}
+Metrics/Signals: ${context.metrics}
+Constraints: ${context.constraints || 'None specified'}
+Primary 90-Day Goal: ${context.goal}
 `;
   }
 
@@ -63,107 +74,108 @@ Region: ${context.region}
     const prompt = `
 ${this.getBasePrompt(context)}
 Generate the CEO Executive Summary. Respond ONLY in JSON.
-{
-  "stage": "Comprehensive stage assessment",
-  "objective": "Primary objective",
-  "risk": "Most critical existential risk",
-  "decision": "One hard executive decision",
-  "doNotDo": ["List of things to stop doing or ignore"],
-  "focusNext": "Specific focus for the next 14-30 days"
-}
 `;
+    // Configured responseSchema for strict JSON output compliance
     const response = await this.ai.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
-      config: { responseMimeType: "application/json" },
+      config: { 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            stage: {
+              type: Type.STRING,
+              description: "Comprehensive stage assessment",
+            },
+            objective: {
+              type: Type.STRING,
+              description: "Primary objective",
+            },
+            risk: {
+              type: Type.STRING,
+              description: "Most critical existential risk",
+            },
+            decision: {
+              type: Type.STRING,
+              description: "One hard executive decision",
+            },
+            doNotDo: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "List of things to stop doing or ignore",
+            },
+            focusNext: {
+              type: Type.STRING,
+              description: "Specific focus for the next 14-30 days",
+            }
+          },
+          propertyOrdering: ["stage", "objective", "risk", "decision", "doNotDo", "focusNext"],
+        }
+      },
     });
+    // Property .text is used directly on GenerateContentResponse
     return JSON.parse(response.text || '{}');
   }
 
   async generateAgentOutput(agent: AgentType, context: StartupContext): Promise<string> {
-    let agentSpecificPrompt = '';
-    
-    switch (agent) {
-      case 'CEO':
-        agentSpecificPrompt = `Provide the definitive CEO Strategy and Priorities Mandate.
-        REQUIRED: Full rationale for current stage, primary objective, critical risk, one executive decision, "Board Kill List" (what to stop/ignore), and next 14-30 day focus.
-        Decisive and opinionated.`;
-        break;
-      case 'CPO':
-        agentSpecificPrompt = `Provide the CPO Product Mandate. Focus: Building the right thing.
-        REQUIRED: Minimum Viable Customer Category, Core Job-To-Be-Done, Feature Kill List, Success Definition.
-        Note friction points if stage is early users/scaling. No UX audits here.`;
-        break;
-      case 'CMO':
-        agentSpecificPrompt = `Provide the Consolidated CMO GTM and Growth Mandate.
-        You must deliver two internal reasoning phases in a single output.
-
-        SECTION 1 — GTM STRATEGY (THINKING)
-        REQUIRED: Executive Snapshot, MVCC, Primary GTM Motion, Competitive Battle Cards, Quarterly Roadmap, Tactical Partnerships, Content Pillars, Channel-Specific Hooks. 
-        Focus on strategy and thinking. No tactics here.
-
-        SECTION 2 — GROWTH EXECUTION (DOING)
-        REQUIRED: Growth Funnel, Weekly Experiments, Channel Playbooks, Copy Drafts.
-        Must strictly follow the GTM Strategy in Section 1. Tactical, concrete, executable.
-        
-        GTM defines direction. Growth executes relentlessly. You own both.`;
-        break;
-      case 'SALES':
-        agentSpecificPrompt = `Provide the Sales Mandate. 
-        REQUIRED: ICP Definition, Outreach Sequences, Personalized Messaging, Close Strategies.`;
-        break;
-      case 'CFO':
-        agentSpecificPrompt = `Provide the CFO Finance Mandate.
-        REQUIRED: Burn Rate, Runway, Budget Priorities, Cost Warnings. Conservative and reality-driven.`;
-        break;
-      case 'FUNDRAISING':
-        agentSpecificPrompt = `Provide the Fundraising Strategy Mandate.
-        REQUIRED: Stage Assessment, Target Investor Profile, Narrative Strategy, Required Proof Points, Metrics Investors Expect, Risks and Gaps, Timeline, What Must Be True Before Raising.
-        No artifacts or deck creation.`;
-        break;
-    }
-
     const prompt = `
 ${this.getBasePrompt(context)}
 ROLE: ${agent}
-${agentSpecificPrompt}
 Deliver a massive, structured, and in-depth output.
+${GLOBAL_PRESENTATION_RULES}
 `;
     const response = await this.ai.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
-      config: { systemInstruction: REPORT_INSTRUCTIONS },
     });
     return response.text || '';
   }
 
   async chat(messages: Message[], context: StartupContext): Promise<string> {
     const systemWithContext = `${ROUTER_INSTRUCTIONS}\n${this.getBasePrompt(context)}`;
+    
+    const formattedContents = messages.map(m => {
+      const parts: any[] = [{ text: m.content }];
+      if (m.images) {
+        m.images.forEach(img => {
+          parts.push({ inlineData: { data: img.data, mimeType: img.mimeType } });
+        });
+      }
+      if (m.files) {
+        m.files.forEach(file => {
+          parts.push({ inlineData: { data: file.data, mimeType: file.mimeType } });
+        });
+      }
+      return { role: m.role, parts };
+    });
+
     const response = await this.ai.models.generateContent({
       model: MODEL_NAME,
-      contents: messages.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
+      contents: formattedContents,
       config: { systemInstruction: systemWithContext },
     });
     return response.text || '';
   }
 
-  async analyzeFile(fileData: string, mimeType: string, fileName: string, context: StartupContext): Promise<string> {
-    const isImage = mimeType.startsWith('image/');
-    const taskPrompt = isImage 
-      ? "ACTIVATING CPO — Reason: Visual UX Audit Requested. Exhaustive visual audit of the screenshot. Identify friction, layout issues, and provide a 4-step roadmap."
-      : "ACTIVATING FUNDRAISING — Reason: Pitch Deck Intelligence Requested. Audit for narrative flow, metrics, and red flags. Identify gaps to close.";
-
-    const response = await this.ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: {
-        parts: [
-          { inlineData: { data: fileData, mimeType } },
-          { text: `${this.getBasePrompt(context)}\n${taskPrompt}` }
-        ]
-      },
-      config: { systemInstruction: ROUTER_INSTRUCTIONS },
-    });
-    return response.text || '';
+  async generateSlideImage(slide: PitchDeckSlide): Promise<string | undefined> {
+    try {
+      const prompt = `Generate a high-quality, professional, minimalist business slide background or graphic for a pitch deck slide titled: "${slide.title}". Visual context: ${slide.visualGuidance}. Dark theme, premium aesthetic.`;
+      // Use generateContent for gemini-2.5-flash-image
+      const response = await this.ai.models.generateContent({
+        model: IMAGE_MODEL,
+        contents: { parts: [{ text: prompt }] },
+        config: { imageConfig: { aspectRatio: "16:9" } }
+      });
+      
+      // Iterating through all parts to find the image part
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) return part.inlineData.data;
+      }
+    } catch (e) {
+      console.error("Image gen failed", e);
+    }
+    return undefined;
   }
 }
 
