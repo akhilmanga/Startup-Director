@@ -18,6 +18,7 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
   const [activationText, setActivationText] = useState('');
   const [pendingImages, setPendingImages] = useState<{ data: string; mimeType: string }[]>([]);
   const [pendingFiles, setPendingFiles] = useState<{ data: string; mimeType: string; name: string }[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +52,7 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
 
     const userMsg: Message = { 
       role: 'user', 
-      content: forceMode ? `Selected Mode: ${forceMode}` : (textToSend || "Process intelligence artifact."),
+      content: forceMode ? `Selected Mode: ${forceMode}` : (textToSend || (pendingImages.length > 0 || pendingFiles.length > 0 ? "Analyzing attached intelligence assets." : "Process intelligence artifact.")),
       images: pendingImages.length > 0 ? [...pendingImages] : undefined,
       files: pendingFiles.length > 0 ? [...pendingFiles] : undefined
     };
@@ -118,20 +119,21 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileList = e.target.files;
-    if (!fileList || fileList.length === 0) return;
-    // Fix: Explicitly cast Array.from(fileList) to File[] to resolve 'unknown' type issues
-    const files = Array.from(fileList) as File[];
+  const processFileList = async (fileList: FileList) => {
+    const files = Array.from(fileList);
     const newImages: { data: string; mimeType: string }[] = [];
     const newFiles: { data: string; mimeType: string; name: string }[] = [];
+    
     for (const file of files) {
       const reader = new FileReader();
       await new Promise<void>((resolve) => {
         reader.onload = () => {
           const base64Data = (reader.result as string).split(',')[1];
-          if (file.type.startsWith('image/')) newImages.push({ data: base64Data, mimeType: file.type });
-          else newFiles.push({ data: base64Data, mimeType: file.type, name: file.name });
+          if (file.type.startsWith('image/')) {
+            newImages.push({ data: base64Data, mimeType: file.type });
+          } else {
+            newFiles.push({ data: base64Data, mimeType: file.type, name: file.name });
+          }
           resolve();
         };
         reader.readAsDataURL(file);
@@ -139,6 +141,40 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
     }
     setPendingImages(prev => [...prev, ...newImages]);
     setPendingFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      await processFileList(e.target.files);
+      // Reset input value to allow selecting same file again
+      e.target.value = '';
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files) {
+      await processFileList(e.dataTransfer.files);
+    }
+  };
+
+  const removePendingImage = (index: number) => {
+    setPendingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const exportPPTX = (slides: PitchDeckSlide[]) => {
@@ -295,6 +331,19 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
                 ) : (
                   <div className="bg-blue-600/5 rounded-3xl px-10 py-8 text-white border border-blue-500/10 shadow-xl self-end">
                     <p className="text-2xl font-light tracking-tight">{m.content}</p>
+                    {(m.images || m.files) && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {m.images?.map((img, idx) => (
+                          <img key={idx} src={`data:${img.mimeType};base64,${img.data}`} className="w-16 h-16 object-cover rounded-lg border border-white/10" alt="attachment" />
+                        ))}
+                        {m.files?.map((file, idx) => (
+                          <div key={idx} className="px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 text-[10px] font-black uppercase flex items-center space-x-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span className="max-w-[100px] truncate">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -303,25 +352,80 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
           <div ref={scrollRef} />
         </div>
 
-        <div className="p-10 border-t border-neutral-800/30 bg-[#0d0d10]">
+        <div 
+          className={`p-10 border-t border-neutral-800/30 bg-[#0d0d10] transition-all duration-300 ${isDragging ? 'bg-blue-600/5 ring-2 ring-inset ring-blue-600/30' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Pending Attachments Preview Area */}
+          {(pendingImages.length > 0 || pendingFiles.length > 0) && (
+            <div className="flex flex-wrap gap-4 mb-8 animate-in slide-in-from-bottom-2 duration-300">
+              {pendingImages.map((img, idx) => (
+                <div key={idx} className="relative group">
+                  <img src={`data:${img.mimeType};base64,${img.data}`} className="w-24 h-24 object-cover rounded-2xl border border-neutral-700 shadow-xl" alt="pending" />
+                  <button 
+                    onClick={() => removePendingImage(idx)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              ))}
+              {pendingFiles.map((file, idx) => (
+                <div key={idx} className="relative group flex items-center space-x-4 bg-[#1a1a20] px-6 py-4 rounded-2xl border border-neutral-700 shadow-xl">
+                  <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black uppercase text-white tracking-wider max-w-[150px] truncate">{file.name}</span>
+                    <span className="text-[9px] font-bold uppercase text-neutral-500">Document</span>
+                  </div>
+                  <button 
+                    onClick={() => removePendingFile(idx)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="relative group">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder="Direct the Executive Board... e.g. 'Build a seed stage deck focusing on our growth metrics'"
+              placeholder={isDragging ? "Drop artifacts to analyze..." : "Direct the Executive Board... e.g. 'Audit this pitch deck for seed readiness'"}
               className="w-full bg-[#14141a] border border-neutral-800 rounded-3xl px-10 py-8 pr-32 text-xl text-white focus:outline-none focus:border-blue-600/30 transition-all resize-none font-light min-h-[100px]"
             />
             <div className="absolute right-6 bottom-6 flex items-center space-x-4">
-              <button onClick={() => fileInputRef.current?.click()} className="p-3 text-neutral-600 hover:text-white transition-colors">
+              <button 
+                type="button"
+                onClick={() => fileInputRef.current?.click()} 
+                className="p-3 text-neutral-600 hover:text-white transition-colors cursor-pointer"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               </button>
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,.pdf,.ppt,.pptx" multiple />
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+                accept="image/*,.pdf,.ppt,.pptx" 
+                multiple 
+              />
               <button onClick={() => handleSend()} disabled={isLoading} className="w-14 h-14 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 rounded-2xl flex items-center justify-center text-white transition-all shadow-2xl shadow-blue-900/40">
                 <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
               </button>
             </div>
           </div>
+          {isDragging && (
+            <div className="mt-4 flex items-center justify-center pointer-events-none">
+              <span className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] animate-pulse">Release to attach intelligence assets</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

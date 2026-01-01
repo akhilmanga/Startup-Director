@@ -146,7 +146,11 @@ Generate a pitch deck based on the latest request.
     const systemWithContext = `${ROUTER_INSTRUCTIONS}\n${this.getBasePrompt(context)}`;
     const formattedContents = messages.map(m => ({
       role: m.role,
-      parts: [{ text: m.content }, ...(m.images?.map(i => ({ inlineData: { data: i.data, mimeType: i.mimeType } })) || [])]
+      parts: [
+        { text: m.content }, 
+        ...(m.images?.map(i => ({ inlineData: { data: i.data, mimeType: i.mimeType } })) || []),
+        ...(m.files?.map(f => ({ inlineData: { data: f.data, mimeType: f.mimeType } })) || [])
+      ]
     }));
 
     const response = await this.ai.models.generateContent({
