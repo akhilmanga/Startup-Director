@@ -57,6 +57,9 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
       files: pendingFiles.length > 0 ? [...pendingFiles] : undefined
     };
     
+    // Check if a pitch deck file is being uploaded (PDF or PPTX)
+    const hasPitchDeck = pendingFiles.some(f => /\.(pdf|pptx)$/i.test(f.name));
+    
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setPendingImages([]);
@@ -66,8 +69,8 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
     setIsThinking(true);
 
     try {
-      // 1. Check intent for Deck Generation
-      const isDeckRequest = /deck|pitch|presentation|slides/i.test(textToSend) || forceMode;
+      // 1. Check intent for Deck Generation (MANDATORY: NO DECK GENERATION IF FILE UPLOADED)
+      const isDeckRequest = !hasPitchDeck && (/deck|pitch|presentation|slides/i.test(textToSend) || forceMode);
       
       if (isDeckRequest) {
         setActivationText("Activating FUNDRAISING — Reason: ASSEMBLING PRESENTATION ARTIFACT");
@@ -88,7 +91,7 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
           slides: enrichedSlides 
         }]);
       } else {
-        // Standard chat routing
+        // Standard chat routing (Includes PITCH DECK AUDIT path if file is present)
         const response = await directorService.chat([...messages, userMsg], context);
         setIsThinking(false);
         
