@@ -57,8 +57,8 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
       files: pendingFiles.length > 0 ? [...pendingFiles] : undefined
     };
     
-    // Check if a pitch deck file is being uploaded (PDF or PPTX)
-    const hasPitchDeck = pendingFiles.some(f => /\.(pdf|pptx)$/i.test(f.name));
+    const hasFiles = pendingFiles.length > 0;
+    const hasPitchDeckFile = pendingFiles.some(f => /\.(pdf|pptx)$/i.test(f.name));
     
     setMessages(prev => [...prev, userMsg]);
     setInput('');
@@ -69,16 +69,23 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
     setIsThinking(true);
 
     try {
-      // 1. Check intent for Deck Generation (MANDATORY: NO DECK GENERATION IF FILE UPLOADED)
-      const isDeckRequest = !hasPitchDeck && (/deck|pitch|presentation|slides/i.test(textToSend) || forceMode);
+      // INTENT CLASSIFICATION - HARD GATE
+      // INTENT_A: PITCH DECK CREATION (Must contain explicit keywords)
+      const creationKeywords = /(create|generate|build|make)\s+(a\s+)?(pitch|investor|fundraising|series\s+[a-b]|seed)\s+deck/i;
+      const explicitCreationRequest = creationKeywords.test(textToSend) || forceMode;
       
-      if (isDeckRequest) {
-        setActivationText("Activating FUNDRAISING — Reason: ASSEMBLING PRESENTATION ARTIFACT");
+      // INTENT_B: PITCH DECK AUDIT
+      const auditKeywords = /(audit|review|rate|feedback|critique)/i;
+      const isAuditRequest = hasPitchDeckFile || auditKeywords.test(textToSend);
+
+      // ROUTING ENFORCEMENT
+      if (explicitCreationRequest && !hasPitchDeckFile) {
+        // INTENT_A — PITCH DECK CREATION
+        setActivationText("Activating FUNDRAISING — Reason: ASSEMBLING INSTITUTIONAL ARTIFACT");
         setIsActivating(true);
         const slides = await directorService.generateDeckArtifact(context, textToSend, messages);
         setIsActivating(false);
         
-        // Parallel generate images for all slides
         const enrichedSlides = await Promise.all(slides.map(async s => {
           const img = await directorService.generateSlideImage(s);
           return { ...s, imageUrl: img ? `data:image/png;base64,${img}` : undefined };
@@ -86,12 +93,12 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
 
         setMessages(prev => [...prev, { 
           role: 'model', 
-          content: "PRESENTATION ARTIFACT GENERATED — READY FOR DOWNLOAD",
+          content: "INVESTOR ARTIFACT GENERATED — READY FOR DEPLOYMENT",
           isDeckGeneration: true,
           slides: enrichedSlides 
         }]);
       } else {
-        // Standard chat routing (Includes PITCH DECK AUDIT path if file is present)
+        // INTENT_B (Audit) or INTENT_C (Casual/General)
         const response = await directorService.chat([...messages, userMsg], context);
         setIsThinking(false);
         
@@ -149,7 +156,6 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       await processFileList(e.target.files);
-      // Reset input value to allow selecting same file again
       e.target.value = '';
     }
   };
@@ -189,40 +195,60 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
       s.background = { color: '0a0a0c' };
       
       if (slide.imageUrl) {
-        s.addImage({ data: slide.imageUrl, x: 0, y: 0, w: '100%', h: '100%', opacity: 20 });
+        s.addImage({ data: slide.imageUrl, x: 0, y: 0, w: '100%', h: '100%', opacity: 15 });
       }
 
+      // Title Rendering — Auto-fit and Safe Margins (Enforced 90% Box)
       s.addText(slide.title, { 
-        x: 0.5, y: 0.5, w: '90%', fontSize: 36, bold: true, color: '2563eb', fontFace: 'Inter' 
+        x: '5%', y: '5%', w: '90%', h: 1.2,
+        fontSize: 44, 
+        bold: true, 
+        color: '2563eb', 
+        fontFace: 'Inter',
+        align: 'left',
+        valign: 'middle',
+        autoFit: true, // Prevents truncation by shrinking text to fit
+        breakLine: true
       });
 
+      // Content Rendering — Strict Margin Bounding
       s.addText(slide.content, { 
-        x: 0.5, y: 1.5, w: '60%', fontSize: 18, color: 'ffffff', fontFace: 'Inter', valign: 'top' 
+        x: '5%', y: '20%', w: '55%', h: '70%',
+        fontSize: 20, 
+        color: 'ffffff', 
+        fontFace: 'Inter', 
+        valign: 'top', 
+        lineSpacing: 24,
+        autoFit: true,
+        breakLine: true
       });
 
       if (slide.chartData && slide.chartData.length > 0) {
         const labels = slide.chartData.map(d => d.label);
         const data = slide.chartData.map(d => d.value);
-        s.addChart(pres.ChartType.bar, [ { name: 'Traction', labels, values: data } ], { 
-          x: 7, y: 2, w: 5, h: 4, showLegend: false, barDir: 'col', chartColors: ['2563eb'] 
+        s.addChart(pres.ChartType.bar, [ { name: 'Institutional Metric', labels, values: data } ], { 
+          x: 7.2, y: 2.5, w: 4.8, h: 4, 
+          showLegend: false, 
+          barDir: 'col', 
+          chartColors: ['2563eb'] 
         });
       }
     });
 
-    pres.writeFile({ fileName: `Startup_Director_Deck_${context.name}.pptx` });
+    pres.writeFile({ fileName: `Executive_Artifact_${context.name}.pptx` });
   };
 
   const renderChart = (data: ChartDataPoint[]) => {
     const max = Math.max(...data.map(d => d.value), 1);
     return (
-      <div className="flex items-end space-x-3 h-48 w-full bg-neutral-900/40 rounded-2xl p-6 border border-white/5">
+      <div className="flex items-end space-x-3 h-56 w-full bg-[#121216]/60 rounded-3xl p-8 border border-white/5">
         {data.map((d, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center group">
+          <div key={i} className="flex-1 flex flex-col items-center group h-full justify-end">
             <div 
-              className="w-full bg-blue-600 rounded-t-lg transition-all duration-1000 group-hover:bg-blue-400" 
+              className="w-full bg-blue-600 rounded-t-xl transition-all duration-1000 group-hover:bg-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.2)]" 
               style={{ height: `${(d.value / max) * 100}%` }}
             ></div>
-            <span className="mt-3 text-[9px] font-black uppercase text-neutral-500 whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">{d.label}</span>
+            <span className="mt-4 text-[8px] font-black uppercase text-neutral-600 tracking-widest whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">{d.label}</span>
           </div>
         ))}
       </div>
@@ -230,51 +256,60 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
   };
 
   const renderSlidesPreview = (slides: PitchDeckSlide[]) => (
-    <div className="space-y-10 py-8">
-      <div className="flex items-center justify-between border-b border-neutral-800 pb-6">
+    <div className="space-y-16 py-12">
+      <div className="flex items-center justify-between border-b border-neutral-800 pb-10">
         <div>
-          <h3 className="text-xl font-black text-white uppercase tracking-tighter">Deck Artifact Assembly</h3>
-          <p className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Status: Confirmed High-Fidelity Output</p>
+          <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Institutional Artifact</h3>
+          <p className="text-[10px] text-blue-500 font-black uppercase mt-2 tracking-[0.3em]">Status: High-Conviction Investor Ready</p>
         </div>
         <button 
           onClick={() => exportPPTX(slides)}
-          className="flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl shadow-blue-900/20 active:scale-95"
+          className="flex items-center space-x-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-blue-900/40 active:scale-95 border border-blue-400/20"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Download PPTX</span>
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-12">
+      <div className="grid grid-cols-1 gap-20">
         {slides.map((slide, idx) => (
-          <div key={idx} className="relative aspect-video w-full bg-[#0c0c0e] border border-neutral-800/60 rounded-[40px] overflow-hidden shadow-2xl flex flex-col animate-in fade-in duration-700">
+          <div key={idx} className="relative aspect-video w-full bg-[#0a0a0c] border border-neutral-800/80 rounded-[56px] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col animate-in fade-in slide-in-from-bottom-10 duration-1000">
             {slide.imageUrl && (
-              <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none" />
+              <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none grayscale" />
             )}
-            <div className="relative z-10 flex flex-col h-full p-16">
-              <div className="flex justify-between items-start mb-10">
-                <div className="flex items-center space-x-4">
-                   <div className="px-4 py-1.5 bg-blue-600 text-white font-black text-[10px] rounded-lg uppercase tracking-widest">{slide.layoutType}</div>
-                   <h4 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">{slide.title}</h4>
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-transparent to-transparent pointer-events-none" />
+            
+            <div className="relative z-10 flex flex-col h-full p-20">
+              <div className="flex justify-between items-start mb-16">
+                <div className="flex flex-col space-y-4">
+                   <div className="px-5 py-2 bg-blue-600/10 border border-blue-500/20 text-blue-500 font-black text-[9px] rounded-full uppercase tracking-[0.4em] inline-block w-fit">{slide.layoutType}</div>
+                   <h4 className="text-5xl font-black text-white uppercase tracking-tighter leading-[0.9]">{slide.title}</h4>
                 </div>
-                <span className="text-[11px] font-black text-neutral-700 uppercase">Slide {idx + 1}</span>
+                <div className="text-[12px] font-black text-neutral-800 uppercase tracking-widest border-2 border-neutral-900 px-4 py-1 rounded-xl">0{idx + 1}</div>
               </div>
-              <div className="flex flex-1 gap-12 overflow-hidden">
-                <div className="flex-[3] space-y-6">
-                   <p className="text-2xl font-light text-neutral-300 leading-relaxed tracking-tight">{slide.content}</p>
+              
+              <div className="flex flex-1 gap-16 overflow-hidden">
+                <div className="flex-[3] flex flex-col justify-center">
+                   <p className="text-3xl font-light text-neutral-200 leading-[1.4] tracking-tight">{slide.content}</p>
                 </div>
                 {slide.chartData && slide.chartData.length > 0 && (
-                   <div className="flex-[2] flex flex-col justify-end">
-                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mb-4">Live Traction Data</p>
+                   <div className="flex-[2] flex flex-col justify-center">
+                      <p className="text-[10px] font-black text-blue-500/60 uppercase tracking-[0.5em] mb-6 text-center">Institutional Data Wedge</p>
                       {renderChart(slide.chartData)}
                    </div>
                 )}
               </div>
-              <div className="mt-12 pt-8 border-t border-white/5 flex items-center justify-between">
-                <div className="flex items-center space-x-3 opacity-30">
-                  <div className="w-8 h-8 bg-neutral-800 rounded-lg flex items-center justify-center text-[10px] font-black">SD</div>
-                  <span className="text-[10px] font-black uppercase tracking-widest">Startup Director v3.1</span>
+              
+              <div className="mt-16 pt-10 border-t border-white/5 flex items-center justify-between">
+                <div className="flex items-center space-x-4 opacity-40">
+                  <div className="w-10 h-10 bg-neutral-900 rounded-2xl flex items-center justify-center text-[11px] font-black text-neutral-500">SD</div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Startup Director</span>
+                    <span className="text-[8px] font-bold uppercase text-neutral-600">Executive Artifact v4.0</span>
+                  </div>
                 </div>
-                <p className="text-[10px] italic text-neutral-600 font-medium">Visual: {slide.visualGuidance.substring(0, 100)}...</p>
+                <div className="max-w-[300px]">
+                  <p className="text-[9px] font-black text-neutral-700 uppercase tracking-widest text-right leading-relaxed">{slide.visualGuidance.substring(0, 120)}</p>
+                </div>
               </div>
             </div>
           </div>

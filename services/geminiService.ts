@@ -30,31 +30,30 @@ Execution required.
 `;
 
 const PITCH_DECK_AUDIT_INSTRUCTIONS = `
-PITCH DECK AUDIT MODE (HARD OVERRIDE):
-When a pitch deck file (PDF or PPTX) is uploaded:
+PITCH DECK AUDIT MODE (INTENT_B — HARD OVERRIDE):
+When a pitch deck file (PDF or PPTX) is uploaded OR user asks for audit/review/critique:
 1. YOU MUST treat the uploaded file as the ONLY source of truth.
 2. YOU MUST audit the actual content: Narrative coherence, Problem clarity, Market framing, Solution differentiation, Traction, Business model, Visuals, and Investor readiness.
 3. YOU MUST NOT generate new slides, slide previews, thumbnails, or PPTX artifacts.
-4. YOU MUST NOT invent a different company, brand, or narrative.
-5. YOU MUST identify: What works, what is weak, what investors will challenge, and what is missing.
-6. YOU MUST NOT assume internal project context if it contradicts the file.
-7. YOUR OUTPUT must be textual analysis only.
+4. YOUR OUTPUT must be textual analysis only.
+5. Provide slide-by-slide feedback and actionable improvement suggestions.
 `;
 
 const PRESENTATION_ARTIFACT_INSTRUCTIONS = `
-PRESENTATION ARTIFACT GENERATION MODE:
-When the user requests a NEW pitch deck or Fundraising Agent is activated for deck creation (AND NO DECK IS UPLOADED):
-1. YOU MUST NOT output text in chat.
-2. YOU MUST NOT output JSON or [SLIDES] directly in the visible chat.
-3. YOUR MISSION: Generate a structured sequence of slides.
-4. Each slide must have a distinct layoutType (Title, Problem, Solution, Market, Traction, BusinessModel, Team, Ask).
-5. For Traction and Market slides, provide numeric 'chartData' for visual rendering.
-6. Provide specific 'visualGuidance' that describes the composition, icons, and diagrams needed.
+INSTITUTIONAL-GRADE PITCH DECK GENERATION (INTENT_A — END-GAME UPGRADE):
+Trigger ONLY if the user explicitly requests to "create", "generate", "build", or "make" a pitch/investor/fundraising deck.
+
+CORE OPERATING PRINCIPLES:
+1. STAGE-AWARE INTELLIGENCE: Identify if Seed, Series A, Series B, or Growth.
+2. SELECTIVE SLIDE SELECTION: Only include slides that strengthen conviction.
+3. CONTENT STANDARDS: Short, declarative headers. Zero buzzwords. High-signal metrics only.
+4. VISUAL & CHART REQUIREMENTS: 90% content bounding box safety. Charts communicate one specific insight.
+5. NO FILLER. Every word must be investor-ready.
 `;
 
 const GLOBAL_PRESENTATION_RULES = `
 ABSOLUTE FORMATTING RULES:
-- ZERO MARKDOWN: Never use asterisks, hashes, or dashes.
+- ZERO MARKDOWN: Never use asterisks, hashes, or dashes in agent text outputs.
 - UI-NATIVE TEXT: Output clean text for high-end SaaS.
 - DENSITY: Provide exhaustive, in-depth strategic content.
 - TONE: Direct, high-stakes executive tone.
@@ -62,16 +61,25 @@ ABSOLUTE FORMATTING RULES:
 
 const ROUTER_INSTRUCTIONS = `
 You are Startup Director, an autonomous executive board coordinator.
-For every user message:
-1. Classify intent:
-   - PITCH DECK ATTACHED (PDF, PPTX) -> ACTIVATE PITCH DECK AUDIT MODE (FUNDRAISING AGENT).
-   - NEW PITCH DECK REQUEST (NO ATTACHMENT) -> ACTIVATE Presentation Artifact Generation.
-   - PITCH DECK TWEAKS (TO EXISTING ARTIFACT) -> Update the existing artifact.
-   - DEFAULT -> Map to relevant C-Suite agent (CPO, CMO, SALES, CFO, CEO).
+For every user message, YOU MUST classify the intent into exactly one of:
 
-2. START your response with exactly: "ACTIVATING [AGENT NAME] — Reason: [INTENT SUMMARY]" in uppercase.
+INTENT_A: PITCH DECK CREATION
+- User explicitly asks to build/create/generate/make a new pitch deck.
+- ACTION: Respond with exactly "INTENT_A_CONFIRMED" followed by a short activation message.
 
-3. All agent responses must follow the EXECUTIVE COMMUNICATION STANDARD.
+INTENT_B: PITCH DECK AUDIT / REVIEW
+- User uploads a deck OR asks for feedback/audit/rating/review.
+- ACTION: Follow PITCH DECK AUDIT MODE instructions. Text-only audit output.
+
+INTENT_C: TEXT QUESTION / CONVERSATION
+- Casual chat, explanations, demo questions, general advice.
+- ACTION: Respond with normal text only. NEVER generate decks or artifacts.
+
+ROUTING RULE:
+If the message does NOT clearly match INTENT_A, DO NOT trigger deck generation.
+
+START your response with: "ACTIVATING [AGENT NAME] — Reason: [INTENT SUMMARY]" in uppercase.
+All agent responses must follow the EXECUTIVE COMMUNICATION STANDARD.
 ${EXECUTIVE_HEADER_INSTRUCTIONS}
 ${PITCH_DECK_AUDIT_INSTRUCTIONS}
 ${GLOBAL_PRESENTATION_RULES}
@@ -144,7 +152,7 @@ ${EXECUTIVE_HEADER_INSTRUCTIONS}
     const systemInstruction = `
 ${PRESENTATION_ARTIFACT_INSTRUCTIONS}
 ${this.getBasePrompt(context)}
-Generate a pitch deck based on the latest request.
+Generate an institutional-grade pitch deck. Be opinionated and selective.
 `;
     const response = await this.ai.models.generateContent({
       model: MODEL_NAME,
@@ -157,9 +165,9 @@ Generate a pitch deck based on the latest request.
           items: {
             type: Type.OBJECT,
             properties: {
-              title: { type: Type.STRING },
-              content: { type: Type.STRING },
-              visualGuidance: { type: Type.STRING },
+              title: { type: Type.STRING, description: "Short, declarative, high-impact header." },
+              content: { type: Type.STRING, description: "Institutional-grade, proof-heavy copy. No fluff." },
+              visualGuidance: { type: Type.STRING, description: "Detailed cinematic direction for the design team." },
               layoutType: { 
                 type: Type.STRING, 
                 enum: ['Title', 'Problem', 'Solution', 'Market', 'Traction', 'BusinessModel', 'Team', 'Ask'] 
@@ -204,7 +212,7 @@ Generate a pitch deck based on the latest request.
 
   async generateSlideImage(slide: PitchDeckSlide): Promise<string | undefined> {
     try {
-      const prompt = `Generate a cinematic, minimalist, hyper-professional business graphic for a "${slide.layoutType}" slide in a tech pitch deck. Context: ${slide.title}. Background should be dark, abstract, and premium. No text in the image. 4k high-end SaaS aesthetic.`;
+      const prompt = `Cinematic, hyper-professional, minimalist business photography for a "${slide.layoutType}" pitch slide. Theme: ${slide.visualGuidance}. Dark aesthetic, high-contrast, premium 4k SaaS style. Zero text in image.`;
       const response = await this.ai.models.generateContent({
         model: IMAGE_MODEL,
         contents: { parts: [{ text: prompt }] },
