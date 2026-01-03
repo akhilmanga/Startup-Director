@@ -54,15 +54,20 @@ const Dashboard: React.FC<Props> = ({ context }) => {
       <div className="space-y-4">
         {segments.map((segment, i) => {
           const isHeader = segment === segment.toUpperCase() && segment.length < 150;
+          
+          // Memo header detection
+          const isMemoField = segment.startsWith('TO:') || segment.startsWith('FROM:') || segment.startsWith('SUBJECT:') || segment.startsWith('SUMMARY:');
+          
           const isMainTitle = isHeader && (segment.includes('MANDATE') || segment.includes('PREPARED BY') || segment.includes('TARGET'));
-          const isSectionHeader = isHeader && !isMainTitle;
+          const isSectionHeader = isHeader && !isMainTitle && !isMemoField;
 
           return (
-            <div key={i} className={isHeader ? 'mt-4 mb-1' : 'mb-3'}>
+            <div key={i} className={(isHeader || isMemoField) ? 'mt-4 mb-1' : 'mb-3'}>
               <p className={`
                 ${isMainTitle ? 'text-lg font-black text-blue-500 uppercase tracking-tight leading-tight' : ''}
                 ${isSectionHeader ? 'text-xs font-bold text-white uppercase tracking-tight border-l-2 border-blue-600/40 pl-4 py-0.5 mt-2' : ''}
-                ${!isHeader ? 'text-neutral-300 text-[18px] leading-[1.8] font-light tracking-tight text-justify' : ''}
+                ${isMemoField ? 'text-[13px] font-black text-white uppercase tracking-[0.15em] border-b border-white/5 pb-2 mb-2 bg-blue-600/5 px-2 py-1 inline-block min-w-full' : ''}
+                ${(!isHeader && !isMemoField) ? 'text-neutral-300 text-[18px] leading-[1.8] font-light tracking-tight text-justify' : ''}
               `}>
                 {segment}
               </p>

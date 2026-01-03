@@ -5,6 +5,30 @@ import { StartupContext, AgentType, Message, CEOSummary, PitchDeckSlide } from "
 const MODEL_NAME = 'gemini-3-pro-preview';
 const IMAGE_MODEL = 'gemini-2.5-flash-image';
 
+const EXECUTIVE_HEADER_INSTRUCTIONS = `
+EXECUTIVE COMMUNICATION STANDARD (MANDATORY):
+1. Every report MUST start with this exact header block:
+TO: [Recipient]
+FROM: [Agent Role]
+SUBJECT: [Directive-style headline]
+SUMMARY:
+
+2. RECIPIENT RULES:
+   - If ROLE is CEO: TO: Founder / User, FROM: CEO Agent
+   - Otherwise: TO: CEO Agent, FROM: [Specific Agent Role] (e.g., CPO Agent, CMO Agent)
+
+3. SUBJECT RULES:
+   - Must be a directive-style headline (e.g., OPERATION REVENUE VELOCITY).
+   - Core mandate or decision oriented.
+   - FULL UPPERCASE.
+   - No punctuation except slashes.
+   - NO DATES.
+
+4. TERMINATION RULE:
+   - Every report MUST end with a decisive final paragraph, followed by the exact phrase on its own line:
+Execution required.
+`;
+
 const PRESENTATION_ARTIFACT_INSTRUCTIONS = `
 PRESENTATION ARTIFACT GENERATION MODE:
 When the user requests a pitch deck or Fundraising Agent is activated for deck creation:
@@ -34,6 +58,9 @@ For every user message:
    - DEFAULT -> Map to relevant C-Suite agent (CPO, CMO, SALES, CFO, CEO).
 
 2. START your response with exactly: "ACTIVATING [AGENT NAME] — Reason: [INTENT SUMMARY]" in uppercase.
+
+3. All agent responses must follow the EXECUTIVE COMMUNICATION STANDARD.
+${EXECUTIVE_HEADER_INSTRUCTIONS}
 ${GLOBAL_PRESENTATION_RULES}
 ${PRESENTATION_ARTIFACT_INSTRUCTIONS}
 `;
@@ -91,6 +118,7 @@ ${this.getBasePrompt(context)}
 ROLE: ${agent}
 Deliver a massive, structured, and in-depth strategic mandate.
 ${GLOBAL_PRESENTATION_RULES}
+${EXECUTIVE_HEADER_INSTRUCTIONS}
 `;
     const response = await this.ai.models.generateContent({
       model: MODEL_NAME,
