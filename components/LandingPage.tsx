@@ -21,28 +21,15 @@ const LandingPage: React.FC<Props> = ({ onInitialize }) => {
   ];
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-[#060608] flex flex-col font-inter">
-      {/* CANONICAL VISUAL FOUNDATION: Cinematic Boardroom Background */}
-      <div className="absolute inset-0 z-0 select-none pointer-events-none">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover scale-[1.02]"
-          style={{ filter: 'brightness(0.25) contrast(1.1) saturate(0.8)' }}
-        >
-          <source src="https://storage.googleapis.com/static.recommender.google.com/startup_director/boardroom_cinematic.mp4" type="video/mp4" />
-          <source src="boardroom_cinematic.mp4" type="video/mp4" />
-        </video>
-        
-        {/* Institutional Grade Overlays */}
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#060608] flex flex-col font-inter scroll-smooth no-scrollbar">
+      {/* CANONICAL VISUAL FOUNDATION: Cinematic Ambient Layer */}
+      <div className="fixed inset-0 z-0 select-none pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black/95" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.04)_0%,transparent_80%)]" />
       </div>
 
       {/* Main UI Layer */}
-      <div className="relative z-20 flex flex-col h-full items-center justify-between py-16 px-8">
+      <div className="relative z-20 flex flex-col flex-1 items-center py-16 px-8 space-y-24">
         
         {/* HERO CONTENT */}
         <div className={`flex flex-col items-center text-center transition-all duration-[2000ms] cubic-bezier(0.16, 1, 0.3, 1) ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -79,11 +66,9 @@ const LandingPage: React.FC<Props> = ({ onInitialize }) => {
           </div>
         </div>
 
-        {/* MINDMAP VISUAL: AGENT HIERARCHY */}
-        <div className={`w-full max-w-6xl mt-12 transition-all duration-[2500ms] delay-500 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
+        {/* AGENT HIERARCHY MINDMAP */}
+        <div className={`w-full max-w-6xl transition-all duration-[2500ms] delay-500 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
           <div className="relative h-[400px] flex flex-col items-center">
-            
-            {/* CEO Node - Central Authority */}
             <div className="relative z-30 flex flex-col items-center group mb-12">
               <div className="relative">
                 <div className="absolute -inset-10 bg-blue-500/10 blur-3xl rounded-full opacity-40 group-hover:opacity-80 transition-opacity animate-pulse" />
@@ -93,7 +78,6 @@ const LandingPage: React.FC<Props> = ({ onInitialize }) => {
               </div>
             </div>
 
-            {/* SVG Connections Layer */}
             <svg className="absolute top-14 left-0 w-full h-[300px] pointer-events-none z-10" viewBox="0 0 1000 300" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="pathGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -108,38 +92,20 @@ const LandingPage: React.FC<Props> = ({ onInitialize }) => {
                   </feMerge>
                 </filter>
               </defs>
-              
-              {/* Hierarchical Paths */}
               {agents.map((_, i) => {
                 const xEnd = (i * 200) + 100;
-                // Cubic bezier for elegant organic curves
                 const pathData = `M500 0 C 500 150, ${xEnd} 50, ${xEnd} 200`;
                 return (
                   <g key={i}>
-                    <path 
-                      d={pathData} 
-                      stroke="url(#pathGradient)" 
-                      strokeWidth="1.5" 
-                      fill="none" 
-                      opacity="0.3" 
-                      filter="url(#glow)" 
-                      className="transition-opacity duration-1000"
-                    />
-                    {/* Data Pulse Animation */}
+                    <path d={pathData} stroke="url(#pathGradient)" strokeWidth="1.5" fill="none" opacity="0.3" filter="url(#glow)" />
                     <circle r="2" fill="#3b82f6" opacity="0.8">
-                      <animateMotion 
-                        dur={`${2.5 + i * 0.5}s`} 
-                        repeatCount="indefinite" 
-                        path={pathData} 
-                        begin={`${i * 0.4}s`}
-                      />
+                      <animateMotion dur={`${2.5 + i * 0.5}s`} repeatCount="indefinite" path={pathData} begin={`${i * 0.4}s`} />
                     </circle>
                   </g>
                 );
               })}
             </svg>
 
-            {/* Subordinate Nodes Container */}
             <div className="relative z-30 w-full flex justify-between items-start pt-12">
               {agents.map((agent, i) => (
                 <div key={agent.id} className="flex flex-col items-center group w-1/5 animate-premium-fade" style={{ animationDelay: `${700 + i * 150}ms` }}>
@@ -157,10 +123,10 @@ const LandingPage: React.FC<Props> = ({ onInitialize }) => {
       {/* Cinematic Depth Elements */}
       <div className="absolute inset-0 pointer-events-none z-10">
         <div className="absolute top-[30%] left-[15%] w-[500px] h-[500px] bg-blue-600/[0.03] rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-[20%] right-[15%] w-[600px] h-[600px] bg-blue-600/[0.02] rounded-full blur-[180px] animate-pulse" style={{ animationDelay: '3s' }} />
+        <div className="absolute bottom-[10%] right-[15%] w-[600px] h-[600px] bg-blue-600/[0.02] rounded-full blur-[180px] animate-pulse" style={{ animationDelay: '3s' }} />
       </div>
 
-      {/* Grid Overlay for Technical Feel */}
+      {/* Grid Overlay */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]" />
     </div>
   );
