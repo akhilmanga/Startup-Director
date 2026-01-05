@@ -69,18 +69,12 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
     setIsThinking(true);
 
     try {
-      // INTENT CLASSIFICATION - HARD GATE
-      // INTENT_A: PITCH DECK CREATION (Must contain explicit keywords)
       const creationKeywords = /(create|generate|build|make)\s+(a\s+)?(pitch|investor|fundraising|series\s+[a-b]|seed)\s+deck/i;
       const explicitCreationRequest = creationKeywords.test(textToSend) || forceMode;
-      
-      // INTENT_B: PITCH DECK AUDIT
       const auditKeywords = /(audit|review|rate|feedback|critique)/i;
       const isAuditRequest = hasPitchDeckFile || auditKeywords.test(textToSend);
 
-      // ROUTING ENFORCEMENT
       if (explicitCreationRequest && !hasPitchDeckFile) {
-        // INTENT_A — PITCH DECK CREATION
         setActivationText("Activating FUNDRAISING — Reason: ASSEMBLING INSTITUTIONAL ARTIFACT");
         setIsActivating(true);
         const slides = await directorService.generateDeckArtifact(context, textToSend, messages);
@@ -98,7 +92,6 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
           slides: enrichedSlides 
         }]);
       } else {
-        // INTENT_B (Audit) or INTENT_C (Casual/General)
         const response = await directorService.chat([...messages, userMsg], context);
         setIsThinking(false);
         
@@ -193,62 +186,41 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
     slides.forEach(slide => {
       const s = pres.addSlide();
       s.background = { color: '0a0a0c' };
-      
       if (slide.imageUrl) {
         s.addImage({ data: slide.imageUrl, x: 0, y: 0, w: '100%', h: '100%', opacity: 15 });
       }
-
-      // Title Rendering — Auto-fit and Safe Margins (Enforced 90% Box)
       s.addText(slide.title, { 
         x: '5%', y: '5%', w: '90%', h: 1.2,
-        fontSize: 44, 
-        bold: true, 
-        color: '2563eb', 
-        fontFace: 'Inter',
-        align: 'left',
-        valign: 'middle',
-        autoFit: true, // Prevents truncation by shrinking text to fit
-        breakLine: true
+        fontSize: 44, bold: true, color: '2563eb', fontFace: 'Inter',
+        align: 'left', valign: 'middle', autoFit: true, breakLine: true
       });
-
-      // Content Rendering — Strict Margin Bounding
       s.addText(slide.content, { 
         x: '5%', y: '20%', w: '55%', h: '70%',
-        fontSize: 20, 
-        color: 'ffffff', 
-        fontFace: 'Inter', 
-        valign: 'top', 
-        lineSpacing: 24,
-        autoFit: true,
-        breakLine: true
+        fontSize: 20, color: 'ffffff', fontFace: 'Inter', valign: 'top', 
+        lineSpacing: 24, autoFit: true, breakLine: true
       });
-
       if (slide.chartData && slide.chartData.length > 0) {
         const labels = slide.chartData.map(d => d.label);
         const data = slide.chartData.map(d => d.value);
         s.addChart(pres.ChartType.bar, [ { name: 'Institutional Metric', labels, values: data } ], { 
-          x: 7.2, y: 2.5, w: 4.8, h: 4, 
-          showLegend: false, 
-          barDir: 'col', 
-          chartColors: ['2563eb'] 
+          x: 7.2, y: 2.5, w: 4.8, h: 4, showLegend: false, barDir: 'col', chartColors: ['2563eb'] 
         });
       }
     });
-
     pres.writeFile({ fileName: `Executive_Artifact_${context.name}.pptx` });
   };
 
   const renderChart = (data: ChartDataPoint[]) => {
     const max = Math.max(...data.map(d => d.value), 1);
     return (
-      <div className="flex items-end space-x-3 h-56 w-full bg-[#121216]/60 rounded-3xl p-8 border border-white/5">
+      <div className="flex items-end space-x-3 h-56 w-full bg-[#121216]/80 backdrop-blur-md rounded-[32px] p-10 border border-white/5">
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col items-center group h-full justify-end">
             <div 
-              className="w-full bg-blue-600 rounded-t-xl transition-all duration-1000 group-hover:bg-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.2)]" 
+              className="w-full bg-blue-600/80 rounded-t-xl transition-all duration-700 group-hover:bg-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.1)]" 
               style={{ height: `${(d.value / max) * 100}%` }}
             ></div>
-            <span className="mt-4 text-[8px] font-black uppercase text-neutral-600 tracking-widest whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">{d.label}</span>
+            <span className="mt-5 text-[8px] font-black uppercase text-neutral-700 tracking-[0.2em] whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">{d.label}</span>
           </div>
         ))}
       </div>
@@ -256,59 +228,62 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
   };
 
   const renderSlidesPreview = (slides: PitchDeckSlide[]) => (
-    <div className="space-y-16 py-12">
-      <div className="flex items-center justify-between border-b border-neutral-800 pb-10">
-        <div>
-          <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Institutional Artifact</h3>
-          <p className="text-[10px] text-blue-500 font-black uppercase mt-2 tracking-[0.3em]">Status: High-Conviction Investor Ready</p>
+    <div className="space-y-24 py-16">
+      <div className="flex items-center justify-between border-b border-white/[0.04] pb-12">
+        <div className="flex flex-col">
+          <div className="flex items-center space-x-3 mb-2">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <p className="text-[10px] text-blue-500 font-black uppercase tracking-[0.4em]">Artifact Finalized</p>
+          </div>
+          <h3 className="text-4xl font-black text-white uppercase tracking-tighter">Institutional Deck</h3>
         </div>
         <button 
           onClick={() => exportPPTX(slides)}
-          className="flex items-center space-x-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-blue-900/40 active:scale-95 border border-blue-400/20"
+          className="flex items-center space-x-4 px-10 py-5 bg-white text-black hover:bg-neutral-200 rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] transition-all active:scale-95 shadow-[0_20px_50px_rgba(255,255,255,0.1)]"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Download PPTX</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Download Artifact</span>
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-20">
+      <div className="grid grid-cols-1 gap-24">
         {slides.map((slide, idx) => (
-          <div key={idx} className="relative aspect-video w-full bg-[#0a0a0c] border border-neutral-800/80 rounded-[56px] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col animate-in fade-in slide-in-from-bottom-10 duration-1000">
+          <div key={idx} className="relative aspect-video w-full bg-[#0a0a0c] border border-white/[0.05] rounded-[64px] overflow-hidden shadow-[0_60px_120px_rgba(0,0,0,0.9)] flex flex-col group/slide">
             {slide.imageUrl && (
-              <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none grayscale" />
+              <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none grayscale brightness-50 transition-all duration-[3s] group-hover/slide:scale-105" />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-transparent to-transparent pointer-events-none" />
             
-            <div className="relative z-10 flex flex-col h-full p-20">
-              <div className="flex justify-between items-start mb-16">
-                <div className="flex flex-col space-y-4">
-                   <div className="px-5 py-2 bg-blue-600/10 border border-blue-500/20 text-blue-500 font-black text-[9px] rounded-full uppercase tracking-[0.4em] inline-block w-fit">{slide.layoutType}</div>
-                   <h4 className="text-5xl font-black text-white uppercase tracking-tighter leading-[0.9]">{slide.title}</h4>
+            <div className="relative z-10 flex flex-col h-full p-24">
+              <div className="flex justify-between items-start mb-20">
+                <div className="flex flex-col space-y-6">
+                   <div className="px-6 py-2 bg-blue-600/10 border border-blue-500/20 text-blue-500 font-black text-[10px] rounded-full uppercase tracking-[0.4em] inline-block w-fit">{slide.layoutType} Phase</div>
+                   <h4 className="text-6xl font-black text-white uppercase tracking-tighter leading-[0.85]">{slide.title}</h4>
                 </div>
-                <div className="text-[12px] font-black text-neutral-800 uppercase tracking-widest border-2 border-neutral-900 px-4 py-1 rounded-xl">0{idx + 1}</div>
+                <div className="text-[16px] font-black text-neutral-900 uppercase tracking-widest border-2 border-neutral-900 px-6 py-2 rounded-2xl">0{idx + 1}</div>
               </div>
               
-              <div className="flex flex-1 gap-16 overflow-hidden">
-                <div className="flex-[3] flex flex-col justify-center">
-                   <p className="text-3xl font-light text-neutral-200 leading-[1.4] tracking-tight">{slide.content}</p>
+              <div className="flex flex-1 gap-20 overflow-hidden items-center">
+                <div className="flex-[3]">
+                   <p className="text-4xl font-light text-neutral-300 leading-[1.35] tracking-tight">{slide.content}</p>
                 </div>
                 {slide.chartData && slide.chartData.length > 0 && (
-                   <div className="flex-[2] flex flex-col justify-center">
-                      <p className="text-[10px] font-black text-blue-500/60 uppercase tracking-[0.5em] mb-6 text-center">Institutional Data Wedge</p>
+                   <div className="flex-[2] flex flex-col items-center">
+                      <div className="w-full p-1 border-t border-white/[0.05] mb-8" />
                       {renderChart(slide.chartData)}
                    </div>
                 )}
               </div>
               
-              <div className="mt-16 pt-10 border-t border-white/5 flex items-center justify-between">
-                <div className="flex items-center space-x-4 opacity-40">
-                  <div className="w-10 h-10 bg-neutral-900 rounded-2xl flex items-center justify-center text-[11px] font-black text-neutral-500">SD</div>
+              <div className="mt-20 pt-12 border-t border-white/[0.03] flex items-center justify-between">
+                <div className="flex items-center space-x-6 opacity-30">
+                  <div className="w-12 h-12 bg-neutral-900 rounded-[18px] flex items-center justify-center text-[13px] font-black text-neutral-500 border border-white/5">SD</div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Startup Director</span>
-                    <span className="text-[8px] font-bold uppercase text-neutral-600">Executive Artifact v4.0</span>
+                    <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Startup Director</span>
+                    <span className="text-[9px] font-bold uppercase text-neutral-700">Artifact Generation Module v5.1</span>
                   </div>
                 </div>
-                <div className="max-w-[300px]">
-                  <p className="text-[9px] font-black text-neutral-700 uppercase tracking-widest text-right leading-relaxed">{slide.visualGuidance.substring(0, 120)}</p>
+                <div className="max-w-[350px]">
+                  <p className="text-[10px] font-black text-neutral-800 uppercase tracking-widest text-right leading-relaxed italic">{slide.visualGuidance.substring(0, 150)}</p>
                 </div>
               </div>
             </div>
@@ -319,39 +294,48 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
   );
 
   return (
-    <div className="w-full max-w-[95%] mx-auto py-16 animate-in fade-in duration-700 relative">
+    <div className="w-full max-w-[95%] mx-auto py-24 animate-in fade-in duration-1000 relative">
+      {/* Dynamic Overlay HUD */}
       {(isThinking || isActivating) && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-[#0c0c10] border-2 border-blue-600 px-8 py-4 rounded-2xl shadow-2xl flex items-center space-x-4 animate-in zoom-in">
-          <div className="w-4 h-4 border-t-2 border-blue-500 rounded-full animate-spin"></div>
-          <div className="text-center">
-            <p className="text-blue-500 text-[14px] font-black uppercase tracking-[0.2em] mb-0.5">
-              {isActivating ? activationText.split('\n')[0] : "Board Synchronizing..."}
+        <div className="fixed top-32 left-1/2 -translate-x-1/2 z-[100] bg-[#0d0d12]/90 backdrop-blur-xl border border-blue-500/30 px-12 py-6 rounded-3xl shadow-[0_40px_100px_rgba(0,0,0,0.9)] flex items-center space-x-6 animate-in zoom-in slide-in-from-top-4 duration-500">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500/20 blur-lg rounded-full animate-pulse" />
+            <div className="relative w-5 h-5 border-2 border-t-blue-500 border-white/10 rounded-full animate-spin"></div>
+          </div>
+          <div className="flex flex-col">
+            <p className="text-white text-[15px] font-black uppercase tracking-[0.2em] mb-1">
+              {isActivating ? activationText.split('\n')[0] : "Synthesizing Board Intel"}
             </p>
-            {isActivating && <p className="text-white text-[9px] font-bold uppercase opacity-60">{activationText.split('\n')[1]}</p>}
+            {isActivating && <p className="text-blue-500/80 text-[10px] font-black uppercase tracking-[0.3em]">{activationText.split('\n')[1]}</p>}
           </div>
         </div>
       )}
 
-      <div className="bg-[#0b0b0e] border border-neutral-800/40 rounded-[48px] overflow-hidden flex flex-col shadow-2xl min-h-[800px]">
-        <div className="flex-1 overflow-y-auto p-16 space-y-16 custom-scrollbar">
+      <div className="bg-[#08080a] border border-white/[0.04] rounded-[64px] overflow-hidden flex flex-col shadow-[0_80px_150px_rgba(0,0,0,0.8)] min-h-[900px] relative">
+        <div className="flex-1 overflow-y-auto p-16 space-y-24 custom-scrollbar">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full py-48 opacity-10">
-              <p className="text-[12px] font-black uppercase text-white tracking-[0.4em]">Awaiting Board Directives</p>
+            <div className="flex flex-col items-center justify-center h-full py-64">
+              <div className="w-16 h-16 border border-white/[0.05] rounded-3xl flex items-center justify-center mb-10 opacity-20">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <p className="text-[11px] font-black uppercase text-neutral-800 tracking-[0.8em] animate-pulse">Boardroom Idle — Awaiting Directive</p>
             </div>
           )}
           
           {messages.map((m, i) => (
             <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div className={`w-full ${m.role === 'user' ? 'max-w-[80%]' : ''}`}>
+              <div className={`w-full ${m.role === 'user' ? 'max-w-[70%]' : ''}`}>
                 {m.role === 'model' ? (
-                  <div className="bg-[#121216]/50 border border-neutral-800/30 rounded-[40px] p-12">
+                  <div className="bg-[#0d0d12]/40 backdrop-blur-md border border-white/[0.03] rounded-[48px] p-16 shadow-2xl">
                     {m.isModeSelection ? (
-                      <div className="text-center py-10">
-                        <h3 className="text-3xl font-black text-white uppercase mb-8 tracking-tighter">Mode Selection — Required</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto">
+                      <div className="text-center py-12">
+                        <div className="inline-block px-4 py-1 border border-blue-500/30 text-blue-500 text-[9px] font-black uppercase tracking-[0.5em] rounded-full mb-8">Routing Required</div>
+                        <h3 className="text-4xl font-black text-white uppercase mb-12 tracking-tighter leading-none">Intelligence Pathing</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
                           {['Pre-Traction', 'Early Users', 'Traction'].map(mode => (
-                            <button key={mode} onClick={() => handleSend(undefined, mode)} className="px-8 py-8 border border-neutral-800 rounded-3xl text-[11px] font-black uppercase text-neutral-400 hover:text-white hover:border-blue-500 hover:bg-blue-600/5 transition-all">
-                              {mode}
+                            <button key={mode} onClick={() => handleSend(undefined, mode)} className="group relative overflow-hidden px-8 py-10 border border-white/[0.05] rounded-[32px] text-[12px] font-black uppercase text-neutral-500 hover:text-white transition-all duration-500 bg-[#121216]/50">
+                              <div className="absolute inset-0 bg-blue-600 opacity-0 group-hover:opacity-10 transition-opacity" />
+                              <span className="relative z-10 tracking-[0.2em]">{mode}</span>
                             </button>
                           ))}
                         </div>
@@ -359,29 +343,32 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
                     ) : m.isDeckGeneration && m.slides ? (
                       renderSlidesPreview(m.slides)
                     ) : (
-                      <div className="space-y-6">
+                      <div className="space-y-8">
                         {m.content.split('\n').filter(l => l.trim()).map((line, lidx) => (
-                          <p key={lidx} className="text-neutral-300 text-[19px] font-light leading-relaxed tracking-tight">{line}</p>
+                          <p key={lidx} className="text-neutral-400 text-[20px] font-light leading-relaxed tracking-tight">{line}</p>
                         ))}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="bg-blue-600/5 rounded-3xl px-10 py-8 text-white border border-blue-500/10 shadow-xl self-end">
-                    <p className="text-2xl font-light tracking-tight">{m.content}</p>
-                    {(m.images || m.files) && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {m.images?.map((img, idx) => (
-                          <img key={idx} src={`data:${img.mimeType};base64,${img.data}`} className="w-16 h-16 object-cover rounded-lg border border-white/10" alt="attachment" />
-                        ))}
-                        {m.files?.map((file, idx) => (
-                          <div key={idx} className="px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 text-[10px] font-black uppercase flex items-center space-x-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span className="max-w-[100px] truncate">{file.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  <div className="relative group/user-msg">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 to-blue-400/20 blur-xl opacity-0 group-hover/user-msg:opacity-100 transition-opacity" />
+                    <div className="relative bg-gradient-to-br from-blue-600/10 to-blue-500/[0.02] backdrop-blur-md rounded-[32px] px-12 py-10 text-white border border-blue-500/20 shadow-2xl">
+                      <p className="text-2xl font-light tracking-tight leading-relaxed">{m.content}</p>
+                      {(m.images || m.files) && (
+                        <div className="mt-8 flex flex-wrap gap-4">
+                          {m.images?.map((img, idx) => (
+                            <img key={idx} src={`data:${img.mimeType};base64,${img.data}`} className="w-20 h-20 object-cover rounded-[18px] border border-white/10" alt="attachment" />
+                          ))}
+                          {m.files?.map((file, idx) => (
+                            <div key={idx} className="px-5 py-3 bg-white/5 rounded-[18px] border border-white/10 text-[11px] font-black uppercase flex items-center space-x-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                              <span className="max-w-[120px] truncate tracking-widest">{file.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -390,40 +377,35 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
           <div ref={scrollRef} />
         </div>
 
+        {/* Executive Input Terminal */}
         <div 
-          className={`p-10 border-t border-neutral-800/30 bg-[#0d0d10] transition-all duration-300 ${isDragging ? 'bg-blue-600/5 ring-2 ring-inset ring-blue-600/30' : ''}`}
+          className={`p-12 border-t border-white/[0.03] bg-[#0c0c0e] transition-all duration-700 ${isDragging ? 'bg-blue-600/[0.03] ring-2 ring-inset ring-blue-500/20' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Pending Attachments Preview Area */}
+          {/* Pending Attachments UI */}
           {(pendingImages.length > 0 || pendingFiles.length > 0) && (
-            <div className="flex flex-wrap gap-4 mb-8 animate-in slide-in-from-bottom-2 duration-300">
+            <div className="flex flex-wrap gap-4 mb-10 animate-in slide-in-from-bottom-4 duration-500">
               {pendingImages.map((img, idx) => (
                 <div key={idx} className="relative group">
-                  <img src={`data:${img.mimeType};base64,${img.data}`} className="w-24 h-24 object-cover rounded-2xl border border-neutral-700 shadow-xl" alt="pending" />
-                  <button 
-                    onClick={() => removePendingImage(idx)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <img src={`data:${img.mimeType};base64,${img.data}`} className="w-28 h-28 object-cover rounded-[24px] border border-white/[0.05] shadow-2xl" alt="pending" />
+                  <button onClick={() => removePendingImage(idx)} className="absolute -top-3 -right-3 w-8 h-8 bg-black border border-white/10 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-2xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>
                 </div>
               ))}
               {pendingFiles.map((file, idx) => (
-                <div key={idx} className="relative group flex items-center space-x-4 bg-[#1a1a20] px-6 py-4 rounded-2xl border border-neutral-700 shadow-xl">
-                  <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <div key={idx} className="relative group flex items-center space-x-6 bg-white/[0.02] px-8 py-5 rounded-[24px] border border-white/[0.05] shadow-2xl">
+                  <div className="w-12 h-12 bg-blue-600/10 rounded-2xl flex items-center justify-center text-blue-500 border border-blue-500/10">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[11px] font-black uppercase text-white tracking-wider max-w-[150px] truncate">{file.name}</span>
-                    <span className="text-[9px] font-bold uppercase text-neutral-500">Document</span>
+                    <span className="text-[12px] font-black uppercase text-white tracking-[0.1em] max-w-[180px] truncate">{file.name}</span>
+                    <span className="text-[9px] font-black uppercase text-neutral-700 tracking-widest mt-1">Institutional Data</span>
                   </div>
-                  <button 
-                    onClick={() => removePendingFile(idx)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <button onClick={() => removePendingFile(idx)} className="absolute -top-3 -right-3 w-8 h-8 bg-black border border-white/10 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-2xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>
                 </div>
               ))}
@@ -435,33 +417,22 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={isDragging ? "Drop artifacts to analyze..." : "Direct the Executive Board... e.g. 'Audit this pitch deck for seed readiness'"}
-              className="w-full bg-[#14141a] border border-neutral-800 rounded-3xl px-10 py-8 pr-32 text-xl text-white focus:outline-none focus:border-blue-600/30 transition-all resize-none font-light min-h-[100px]"
+              placeholder={isDragging ? "Drop artifacts into terminal..." : "Executive Command Line — [e.g. 'Build seed deck narrative']"}
+              className="w-full bg-[#121216] border border-white/[0.04] rounded-[36px] px-12 py-10 pr-40 text-2xl text-white placeholder:text-neutral-700 focus:outline-none focus:border-blue-600/20 transition-all resize-none font-light min-h-[120px] shadow-inner"
             />
-            <div className="absolute right-6 bottom-6 flex items-center space-x-4">
-              <button 
-                type="button"
-                onClick={() => fileInputRef.current?.click()} 
-                className="p-3 text-neutral-600 hover:text-white transition-colors cursor-pointer"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div className="absolute right-8 bottom-8 flex items-center space-x-6">
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="p-4 text-neutral-600 hover:text-white transition-all duration-300">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileChange} 
-                className="hidden" 
-                accept="image/*,.pdf,.ppt,.pptx" 
-                multiple 
-              />
-              <button onClick={() => handleSend()} disabled={isLoading} className="w-14 h-14 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 rounded-2xl flex items-center justify-center text-white transition-all shadow-2xl shadow-blue-900/40">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,.pdf,.ppt,.pptx" multiple />
+              <button onClick={() => handleSend()} disabled={isLoading} className="w-16 h-16 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-900 disabled:opacity-30 rounded-[22px] flex items-center justify-center text-white transition-all shadow-[0_20px_40px_rgba(37,99,235,0.3)] hover:scale-105 active:scale-95">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
               </button>
             </div>
           </div>
           {isDragging && (
-            <div className="mt-4 flex items-center justify-center pointer-events-none">
-              <span className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] animate-pulse">Release to attach intelligence assets</span>
+            <div className="mt-6 flex items-center justify-center pointer-events-none">
+              <span className="text-[11px] font-black uppercase text-blue-500 tracking-[0.5em] animate-pulse">Release Assets for Compilation</span>
             </div>
           )}
         </div>
