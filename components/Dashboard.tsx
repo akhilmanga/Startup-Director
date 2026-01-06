@@ -197,8 +197,25 @@ const Dashboard: React.FC<Props> = ({ context }) => {
           )}
         </main>
 
+        {/* Floating Air Visual Line */}
+        <div className="w-full flex justify-center py-8 relative group overflow-hidden pointer-events-none">
+          <div className="w-full max-w-5xl h-px relative flex items-center justify-center animate-float-air">
+            {/* Ambient Background Line */}
+            <div className="absolute inset-0 bg-blue-500/10 blur-[1px]"></div>
+            
+            {/* The Cinematic "Scanning" Pulse */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-1/3 h-[2px] bg-gradient-to-r from-transparent via-blue-500/60 to-transparent blur-[2px] animate-scan-slow shadow-[0_0_15px_rgba(59,130,246,0.8)]"></div>
+            </div>
+
+            {/* Micro-Particles */}
+            <div className="absolute w-1 h-1 bg-blue-400/40 rounded-full blur-[1px] left-1/4 animate-pulse"></div>
+            <div className="absolute w-1 h-1 bg-blue-400/40 rounded-full blur-[1px] right-1/4 animate-pulse delay-700"></div>
+          </div>
+        </div>
+
         {/* Global Chat Integration */}
-        <section className="bg-[#060608] border-t border-white/[0.03] px-12 pb-32">
+        <section className="bg-[#060608] px-12 pb-32">
            <Chat context={context} />
         </section>
       </div>

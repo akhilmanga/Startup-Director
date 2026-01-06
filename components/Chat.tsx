@@ -14,8 +14,6 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [isActivating, setIsActivating] = useState(false);
-  const [activationText, setActivationText] = useState('');
   const [pendingImages, setPendingImages] = useState<{ data: string; mimeType: string }[]>([]);
   const [pendingFiles, setPendingFiles] = useState<{ data: string; mimeType: string; name: string }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -31,13 +29,23 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading, isThinking, isActivating]);
+  }, [messages, isLoading, isThinking]);
+
+  // Enhanced response cleaner to aggressively strip executive headers and meta-instructions
+  const cleanExecutiveResponse = (text: string) => {
+    return text
+      .replace(/^\s*(TO|FROM|SUBJECT|SUMMARY|ACTIVATING|RECIPIENT|ROLE)\s*:.*$/gim, '')
+      .replace(/^ACTIVATING .*? — Reason: .*$/gim, '')
+      .replace(/^\s*Execution required\.\s*$/gim, '')
+      .trim();
+  };
 
   const triggerAgentReport = async (agent: AgentType) => {
     setIsLoading(true);
     try {
       const response = await directorService.generateAgentOutput(agent, context);
-      setMessages(prev => [...prev, { role: 'model', content: response, agent }]);
+      const cleanedResponse = cleanExecutiveResponse(response);
+      setMessages(prev => [...prev, { role: 'model', content: cleanedResponse, agent }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'model', content: "SYSTEM ERROR: Failed to process intelligence mandate." }]);
     } finally {
@@ -57,9 +65,6 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
       files: pendingFiles.length > 0 ? [...pendingFiles] : undefined
     };
     
-    const hasFiles = pendingFiles.length > 0;
-    const hasPitchDeckFile = pendingFiles.some(f => /\.(pdf|pptx)$/i.test(f.name));
-    
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setPendingImages([]);
@@ -71,14 +76,10 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
     try {
       const creationKeywords = /(create|generate|build|make)\s+(a\s+)?(pitch|investor|fundraising|series\s+[a-b]|seed)\s+deck/i;
       const explicitCreationRequest = creationKeywords.test(textToSend) || forceMode;
-      const auditKeywords = /(audit|review|rate|feedback|critique)/i;
-      const isAuditRequest = hasPitchDeckFile || auditKeywords.test(textToSend);
+      const hasPitchDeckFile = pendingFiles.some(f => /\.(pdf|pptx)$/i.test(f.name));
 
       if (explicitCreationRequest && !hasPitchDeckFile) {
-        setActivationText("Activating FUNDRAISING — Reason: ASSEMBLING INSTITUTIONAL ARTIFACT");
-        setIsActivating(true);
         const slides = await directorService.generateDeckArtifact(context, textToSend, messages);
-        setIsActivating(false);
         
         const enrichedSlides = await Promise.all(slides.map(async s => {
           const img = await directorService.generateSlideImage(s);
@@ -98,18 +99,9 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
         if (response.includes("MODE_SELECTION_REQUIRED")) {
           setMessages(prev => [...prev, { role: 'model', content: "MODE SELECTION — REQUIRED", isModeSelection: true }]);
         } else {
-          const activationRegex = /^ACTIVATING (.*?) — Reason: (.*?)\n/i;
-          const match = response.match(activationRegex);
-          let finalContent = response;
-          if (match) {
-            const [fullLine, agent, reason] = match;
-            setActivationText(`Activating ${agent}\nReason: ${reason}`);
-            setIsActivating(true);
-            finalContent = response.replace(fullLine, '').trim();
-            await new Promise(r => setTimeout(r, 1200));
-            setIsActivating(false);
-          }
-          setMessages(prev => [...prev, { role: 'model', content: finalContent }]);
+          // Clean the response from headers and hidden routing lines
+          const cleanedContent = cleanExecutiveResponse(response);
+          setMessages(prev => [...prev, { role: 'model', content: cleanedContent }]);
         }
       }
     } catch (error) {
@@ -117,7 +109,6 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
       setMessages(prev => [...prev, { role: 'model', content: "SYSTEM ERROR: Boardroom communications interrupted." }]);
     } finally {
       setIsThinking(false);
-      setIsActivating(false);
       setIsLoading(false);
     }
   };
@@ -295,18 +286,16 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
 
   return (
     <div className="w-full max-w-[95%] mx-auto py-24 animate-in fade-in duration-1000 relative">
-      {/* Dynamic Overlay HUD */}
-      {(isThinking || isActivating) && (
+      {(isThinking || isLoading) && (
         <div className="fixed top-32 left-1/2 -translate-x-1/2 z-[100] bg-[#0d0d12]/90 backdrop-blur-xl border border-blue-500/30 px-12 py-6 rounded-3xl shadow-[0_40px_100px_rgba(0,0,0,0.9)] flex items-center space-x-6 animate-in zoom-in slide-in-from-top-4 duration-500">
           <div className="relative">
             <div className="absolute inset-0 bg-blue-500/20 blur-lg rounded-full animate-pulse" />
             <div className="relative w-5 h-5 border-2 border-t-blue-500 border-white/10 rounded-full animate-spin"></div>
           </div>
           <div className="flex flex-col">
-            <p className="text-white text-[15px] font-black uppercase tracking-[0.2em] mb-1">
-              {isActivating ? activationText.split('\n')[0] : "Synthesizing Board Intel"}
+            <p className="text-white text-[15px] font-black uppercase tracking-[0.2em]">
+              Synthesizing Board Intel
             </p>
-            {isActivating && <p className="text-blue-500/80 text-[10px] font-black uppercase tracking-[0.3em]">{activationText.split('\n')[1]}</p>}
           </div>
         </div>
       )}
@@ -377,14 +366,12 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
           <div ref={scrollRef} />
         </div>
 
-        {/* Executive Input Terminal */}
         <div 
           className={`p-12 border-t border-white/[0.03] bg-[#0c0c0e] transition-all duration-700 ${isDragging ? 'bg-blue-600/[0.03] ring-2 ring-inset ring-blue-500/20' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Pending Attachments UI */}
           {(pendingImages.length > 0 || pendingFiles.length > 0) && (
             <div className="flex flex-wrap gap-4 mb-10 animate-in slide-in-from-bottom-4 duration-500">
               {pendingImages.map((img, idx) => (
