@@ -178,7 +178,9 @@ const Chat: React.FC<Props> = ({ context, activeTabTrigger }) => {
       const s = pres.addSlide();
       s.background = { color: '0a0a0c' };
       if (slide.imageUrl) {
-        s.addImage({ data: slide.imageUrl, x: 0, y: 0, w: '100%', h: '100%', opacity: 15 });
+        // Fix: Use 'transparency' instead of 'opacity' for pptxgenjs ImageProps.
+        // transparency: 85 results in 15% opacity for a background effect.
+        s.addImage({ data: slide.imageUrl, x: 0, y: 0, w: '100%', h: '100%', transparency: 85 });
       }
       s.addText(slide.title, { 
         x: '5%', y: '5%', w: '90%', h: 1.2,
